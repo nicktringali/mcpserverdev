@@ -1,3 +1,4 @@
+ 
 import subprocess
 import shlex
 
@@ -34,7 +35,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from qdrant_client import QdrantClient
 from qdrant_client.http import models as qmodels
 
-from sentence_transformers import SentenceTransformer
 
 from openai import OpenAI
 
@@ -45,9 +45,7 @@ try:
 except Exception:
     TavilyClient = None  # type: ignore
 
-from mcp.server import Server
-from mcp.server.sse import run as run_sse
-from mcp.server.stdio import run as run_stdio
+from mcp.server.fastmcp import FastMCP
 
 load_dotenv()
 
@@ -93,7 +91,10 @@ ENABLE_EXEC = os.getenv("ENABLE_EXEC", "0") not in ("0", "false", "False")
 ENABLE_TESTS = os.getenv("ENABLE_TESTS", "0") not in ("0", "false", "False")
 ENABLE_LINT = os.getenv("ENABLE_LINT", "0") not in ("0", "false", "False")
 
-server = Server(SERVER_NAME)
+server = FastMCP(name=SERVER_NAME, host=MCP_SERVER_HOST, port=MCP_SERVER_PORT)
+
+app.mount("/mcp", server.sse_app(mount_path="/mcp"))
+
 
 class AddTextPayload(BaseModel):
     collection: str
@@ -123,6 +124,7 @@ def get_embedder():
             return [d.embedding for d in resp.data]
         return embed
     else:
+        from sentence_transformers import SentenceTransformer
         model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
         def embed(texts: List[str]) -> List[List[float]]:
             return model.encode(texts, convert_to_numpy=False).tolist()
@@ -178,6 +180,7 @@ async def add_text(collection: str, text: str, id: Optional[str] = None, metadat
 async def debug_web_search(query: str, max_results: int = 3):
     s = get_search()
     return JSONResponse(s(query, max_results=max_results))
+
 
 @server.tool()
 async def query(collection: str, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
@@ -266,6 +269,7 @@ async def info():
 if __name__ == "__main__":
     transport = os.getenv("TRANSPORT", "sse").lower()
     if transport == "stdio":
-        anyio.run(run_stdio, server)
+        server.run("stdio")
     else:
-        anyio.run(run_sse, server, MCP_SERVER_HOST, MCP_SERVER_PORT, app)
+        import uvicorn
+        uvicorn.run(app, host=MCP_SERVER_HOST, port=MCP_SERVER_PORT)

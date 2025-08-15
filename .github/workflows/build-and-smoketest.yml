@@ -1,0 +1,38 @@
+name: build-and-smoketest
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build server image
+        run: docker build -t mcp-supercharger-server ./server
+      - name: Build registry image
+        run: docker build -t mcp-supercharger-registry ./registry
+      - name: Compose config
+        run: docker compose config
+      - name: Smoke test compose up
+        run: |
+          mkdir -p workspace
+          docker compose up -d
+          sleep 25
+          curl -f http://localhost:8001/health
+          curl -f http://localhost:9000/health
+          curl -f http://localhost:8080/health
+          curl -f "http://localhost:8001/debug/web_search?query=hello"
+      - name: Logs on failure
+        if: failure()
+        run: |
+          docker compose ps
+          docker compose logs --tail=200
+      - name: Teardown
+        if: always()
+        run: docker compose down -v

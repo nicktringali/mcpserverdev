@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   mcp-tools:
     build:
@@ -59,8 +57,8 @@ services:
     env_file:
       - ./.env
     environment:
-      - MCP_TOOLS_URL=http://mcp-tools:8000
-      - MCP_KNOWLEDGE_URL=http://mcp-knowledge:8000
+      - MCP_TOOLS_URL=http://mcp-tools:8000/mcp
+      - MCP_KNOWLEDGE_URL=http://mcp-knowledge:8000/mcp
     ports:
       - "8080:8080"
     depends_on:
