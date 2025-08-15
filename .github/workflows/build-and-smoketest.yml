@@ -41,7 +41,7 @@ jobs:
           docker compose up -d
           for url in http://localhost:8001/health http://localhost:9000/health http://localhost:8080/health; do
             echo "Waiting for $url ..."
-            for i in {1..60}; do
+            for i in {1..90}; do
               if curl -fsS "$url" >/dev/null; then
                 echo "$url is up"
                 break
