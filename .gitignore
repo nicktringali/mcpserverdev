@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.venv
+venv/
+
+# Poetry
+poetry.lock
+
+# Node
+node_modules/
+
+# Docker
+**/.dockerignore
+docker-data/
+qdrant_storage/
+pg_data/
+
+# Editors
+.vscode/
+.idea/
+
+# Misc
+workspace/
+mcp_env_report_*.txt
