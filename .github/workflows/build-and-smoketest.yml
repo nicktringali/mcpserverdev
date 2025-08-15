@@ -50,9 +50,6 @@ jobs:
             done
             curl -f "$url"
           done
-      - name: Debug web_search (non-fatal)
-        continue-on-error: true
-        run: curl -fsS "http://localhost:8001/debug/web_search?query=hello" >/devnull
       - name: Logs on failure
         if: failure()
         run: |
