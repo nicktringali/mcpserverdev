@@ -188,5 +188,20 @@ All filesystem operations are sandboxed to /workspace to prevent access outside 
 - Add more domain tools (e.g., database query tool using Postgres)
 
 ## License
+## CI details and troubleshooting
+
+- The GitHub Actions workflow auto-generates a minimal .env and a workspace/ directory so that docker compose can run in CI without secrets.
+- Health checks: CI waits for these to respond with 2xx before proceeding:
+  - http://localhost:8001/health
+  - http://localhost:9000/health
+  - http://localhost:8080/health
+- The debug web_search curl in CI is non-fatal to avoid flakes due to outbound connectivity on the runner.
+
+Troubleshooting:
+- If CI fails at docker compose config: ensure a .env exists. In CI this is created; locally run: cp .env.example .env and edit values.
+- If health checks time out: check docker compose logs, especially the mcp-tools and mcp-knowledge services, and verify that ports 8001 and 9000 are not conflicting on the runner/host.
+- If embedding import errors occur: the server lazily imports sentence-transformers only when OpenAI embeddings are not configured. Set OPENAI_API_KEY to use OpenAI embeddings, or ensure the container can download the model on first run.
+
+
 
 MIT
