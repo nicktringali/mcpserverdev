@@ -220,6 +220,45 @@ async def write_file(path: str, content: str, overwrite: bool = False) -> Dict[s
         f.write(content)
     return {"ok": True, "path": p}
 
+if ENABLE_EXEC:
+    @server.tool()
+    async def exec_cmd(cmd: str, timeout: int = 30, cwd: Optional[str] = None) -> Dict[str, Any]:
+        safe_cwd = _ensure_workspace_path(cwd or ".")
+        try:
+            proc = subprocess.run(cmd, shell=True, cwd=safe_cwd, capture_output=True, text=True, timeout=timeout)
+            return {"ok": proc.returncode == 0, "code": proc.returncode, "stdout": proc.stdout, "stderr": proc.stderr}
+        except subprocess.TimeoutExpired as e:
+            return {"ok": False, "error": "timeout", "stdout": e.stdout or "", "stderr": e.stderr or ""}
+
+    @server.tool()
+    async def pip_install(packages: List[str]) -> Dict[str, Any]:
+        cmd = "pip install " + " ".join(shlex.quote(p) for p in packages)
+        proc = subprocess.run(cmd, shell=True, cwd=_ensure_workspace_path("."), capture_output=True, text=True)
+        return {"ok": proc.returncode == 0, "code": proc.returncode, "stdout": proc.stdout, "stderr": proc.stderr}
+
+if ENABLE_TESTS:
+    @server.tool()
+    async def run_pytest(args: Optional[List[str]] = None) -> Dict[str, Any]:
+        args = args or []
+        cmd = ["pytest", "-q", *args]
+        proc = subprocess.run(cmd, cwd=_ensure_workspace_path("."), capture_output=True, text=True)
+        return {"ok": proc.returncode == 0, "code": proc.returncode, "stdout": proc.stdout, "stderr": proc.stderr}
+
+if ENABLE_LINT:
+    @server.tool()
+    async def run_ruff(args: Optional[List[str]] = None) -> Dict[str, Any]:
+        args = args or ["."]
+        cmd = ["ruff", "check", *args]
+        proc = subprocess.run(cmd, cwd=_ensure_workspace_path("."), capture_output=True, text=True)
+        return {"ok": proc.returncode == 0, "code": proc.returncode, "stdout": proc.stdout, "stderr": proc.stderr}
+
+    @server.tool()
+    async def run_mypy(args: Optional[List[str]] = None) -> Dict[str, Any]:
+        args = args or ["."]
+        cmd = ["mypy", *args]
+        proc = subprocess.run(cmd, cwd=_ensure_workspace_path("."), capture_output=True, text=True)
+        return {"ok": proc.returncode == 0, "code": proc.returncode, "stdout": proc.stdout, "stderr": proc.stderr}
+
 @app.get("/")
 async def info():
     return JSONResponse({"name": "mcp-supercharger", "transport": "sse", "health": "/health"})
