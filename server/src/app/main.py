@@ -151,12 +151,10 @@ def get_search():
             return results
         return search
 
-@server.tool()
 async def web_search(query: str, max_results: int = 5) -> List[Dict[str, Any]]:
     s = get_search()
     return s(query, max_results=max_results)
 
-@server.tool()
 async def add_text(collection: str, text: str, id: Optional[str] = None, metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     embed = get_embedder()
     vec = embed([text])[0]
@@ -182,7 +180,6 @@ async def debug_web_search(query: str, max_results: int = 3):
     return JSONResponse(s(query, max_results=max_results))
 
 
-@server.tool()
 async def query(collection: str, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
     embed = get_embedder()
     qvec = embed([query])[0]
@@ -205,7 +202,6 @@ async def query(collection: str, query: str, top_k: int = 5) -> List[Dict[str, A
         })
     return out
 
-@server.tool()
 async def read_file(path: str) -> str:
     p = _ensure_workspace_path(path)
     if not os.path.exists(p):
@@ -213,7 +209,6 @@ async def read_file(path: str) -> str:
     with open(p, "r", encoding="utf-8") as f:
         return f.read()
 
-@server.tool()
 async def write_file(path: str, content: str, overwrite: bool = False) -> Dict[str, Any]:
     p = _ensure_workspace_path(path)
     if os.path.exists(p) and not overwrite:
@@ -261,6 +256,15 @@ if ENABLE_LINT:
         cmd = ["mypy", *args]
         proc = subprocess.run(cmd, cwd=_ensure_workspace_path("."), capture_output=True, text=True)
         return {"ok": proc.returncode == 0, "code": proc.returncode, "stdout": proc.stdout, "stderr": proc.stderr}
+if ENABLE_TOOLS:
+    server.tool()(web_search)
+    server.tool()(read_file)
+    server.tool()(write_file)
+
+if ENABLE_VECTOR:
+    server.tool()(add_text)
+    server.tool()(query)
+
 
 @app.get("/")
 async def info():
