@@ -1,3 +1,6 @@
+import subprocess
+import shlex
+
 import os
 
 
@@ -86,6 +89,9 @@ async def health():
 SERVER_NAME = os.getenv("SERVER_NAME", "mcp-supercharger")
 ENABLE_TOOLS = os.getenv("ENABLE_TOOLS", "1") not in ("0", "false", "False")
 ENABLE_VECTOR = os.getenv("ENABLE_VECTOR", "1") not in ("0", "false", "False")
+ENABLE_EXEC = os.getenv("ENABLE_EXEC", "0") not in ("0", "false", "False")
+ENABLE_TESTS = os.getenv("ENABLE_TESTS", "0") not in ("0", "false", "False")
+ENABLE_LINT = os.getenv("ENABLE_LINT", "0") not in ("0", "false", "False")
 
 server = Server(SERVER_NAME)
 
