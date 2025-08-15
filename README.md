@@ -195,7 +195,7 @@ All filesystem operations are sandboxed to /workspace to prevent access outside 
   - http://localhost:8001/health
   - http://localhost:9000/health
   - http://localhost:8080/health
-- The debug web_search curl in CI is non-fatal to avoid flakes due to outbound connectivity on the runner.
+- The CI workflow avoids external network calls to prevent flakiness on GitHub-hosted runners.
 
 Troubleshooting:
 - If CI fails at docker compose config: ensure a .env exists. In CI this is created; locally run: cp .env.example .env and edit values.
