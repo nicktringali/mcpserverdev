@@ -1,3 +1,4 @@
+ 
 import subprocess
 import shlex
 
@@ -34,7 +35,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from qdrant_client import QdrantClient
 from qdrant_client.http import models as qmodels
 
-from sentence_transformers import SentenceTransformer
 
 from openai import OpenAI
 
@@ -45,9 +45,7 @@ try:
 except Exception:
     TavilyClient = None  # type: ignore
 
-from mcp.server import Server
-from mcp.server.sse import run as run_sse
-from mcp.server.stdio import run as run_stdio
+from mcp.server.fastmcp import FastMCP
 
 load_dotenv()
 
@@ -93,7 +91,10 @@ ENABLE_EXEC = os.getenv("ENABLE_EXEC", "0") not in ("0", "false", "False")
 ENABLE_TESTS = os.getenv("ENABLE_TESTS", "0") not in ("0", "false", "False")
 ENABLE_LINT = os.getenv("ENABLE_LINT", "0") not in ("0", "false", "False")
 
-server = Server(SERVER_NAME)
+server = FastMCP(name=SERVER_NAME, host=MCP_SERVER_HOST, port=MCP_SERVER_PORT)
+
+app.mount("/mcp", server.sse_app(mount_path="/mcp"))
+
 
 class AddTextPayload(BaseModel):
     collection: str
@@ -123,6 +124,7 @@ def get_embedder():
             return [d.embedding for d in resp.data]
         return embed
     else:
+        from sentence_transformers import SentenceTransformer
         model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
         def embed(texts: List[str]) -> List[List[float]]:
             return model.encode(texts, convert_to_numpy=False).tolist()
@@ -149,12 +151,10 @@ def get_search():
             return results
         return search
 
-@server.tool()
 async def web_search(query: str, max_results: int = 5) -> List[Dict[str, Any]]:
     s = get_search()
     return s(query, max_results=max_results)
 
-@server.tool()
 async def add_text(collection: str, text: str, id: Optional[str] = None, metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     embed = get_embedder()
     vec = embed([text])[0]
@@ -179,7 +179,7 @@ async def debug_web_search(query: str, max_results: int = 3):
     s = get_search()
     return JSONResponse(s(query, max_results=max_results))
 
-@server.tool()
+
 async def query(collection: str, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
     embed = get_embedder()
     qvec = embed([query])[0]
@@ -202,7 +202,6 @@ async def query(collection: str, query: str, top_k: int = 5) -> List[Dict[str, A
         })
     return out
 
-@server.tool()
 async def read_file(path: str) -> str:
     p = _ensure_workspace_path(path)
     if not os.path.exists(p):
@@ -210,7 +209,6 @@ async def read_file(path: str) -> str:
     with open(p, "r", encoding="utf-8") as f:
         return f.read()
 
-@server.tool()
 async def write_file(path: str, content: str, overwrite: bool = False) -> Dict[str, Any]:
     p = _ensure_workspace_path(path)
     if os.path.exists(p) and not overwrite:
@@ -258,6 +256,15 @@ if ENABLE_LINT:
         cmd = ["mypy", *args]
         proc = subprocess.run(cmd, cwd=_ensure_workspace_path("."), capture_output=True, text=True)
         return {"ok": proc.returncode == 0, "code": proc.returncode, "stdout": proc.stdout, "stderr": proc.stderr}
+if ENABLE_TOOLS:
+    server.tool()(web_search)
+    server.tool()(read_file)
+    server.tool()(write_file)
+
+if ENABLE_VECTOR:
+    server.tool()(add_text)
+    server.tool()(query)
+
 
 @app.get("/")
 async def info():
@@ -266,6 +273,7 @@ async def info():
 if __name__ == "__main__":
     transport = os.getenv("TRANSPORT", "sse").lower()
     if transport == "stdio":
-        anyio.run(run_stdio, server)
+        server.run("stdio")
     else:
-        anyio.run(run_sse, server, MCP_SERVER_HOST, MCP_SERVER_PORT, app)
+        import uvicorn
+        uvicorn.run(app, host=MCP_SERVER_HOST, port=MCP_SERVER_PORT)

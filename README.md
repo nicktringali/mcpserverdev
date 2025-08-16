@@ -17,6 +17,28 @@ This repository provides:
 - Healthchecks and resource considerations
 
 ## Features
+## GitHub Actions CI: enabling workflows
+
+If you see “refusing to allow an OAuth App to create or update workflow .github/workflows/... without workflow scope”, you have two options:
+
+1) Quick manual add
+- Create the directory .github/workflows in the repo
+- Add the workflow file build-and-smoketest.yml there (from this PR or the attached file)
+- Commit to the repo. Actions will run automatically on PRs/main after that.
+
+2) Enable permissions so automation can push workflows
+- If using a GitHub App (recommended):
+  - Org Settings → Installed GitHub Apps → find your app (e.g., Devin AI Integration) → Configure
+  - Permissions: set Actions to Read and write
+  - Repository access: grant access to nicktringali/mcpserverdev (or All repositories)
+  - Save
+- If using a PAT (classic):
+  - GitHub → Settings → Developer settings → Personal access tokens (classic) → Generate new token
+  - Scopes: repo and workflow
+  - Update your integration to use this token for pushes
+
+After enabling, we’ll re-push .github/workflows/build-and-smoketest.yml to enable CI.
+
 
 - Web Search:
 
@@ -125,6 +147,28 @@ Data volumes:
 - query(collection: str, query: str, top_k: int = 5) -> list
 - read_file(path: str) -> str
 - write_file(path: str, content: str, overwrite: bool = False) -> dict
+## Example MCP client configs
+
+These target the SSE endpoints. If you set MCP_TOKEN in .env, include the Authorization header.
+
+Tools SSE (port 8001):
+- URL: http://localhost:8001/mcp
+- Headers (if protected): Authorization: Bearer &lt;MCP_TOKEN&gt;
+
+Knowledge SSE (port 9000):
+- URL: http://localhost:9000/mcp
+- Headers (if protected): Authorization: Bearer &lt;MCP_TOKEN&gt;
+
+### stdio mode (local dev)
+Set TRANSPORT=stdio and run the app directly (no HTTP). For example:
+- docker compose exec mcp-tools sh
+- export TRANSPORT=stdio
+- python -m app.main
+
+Your MCP client should connect to the process stdio streams. For Dockerized SSE/HTTP, leave TRANSPORT unset (default: sse).
+
+Note: WebSocket transport can be added later; SSE endpoints are mounted at /mcp and work with current MCP clients that support HTTP/SSE.
+
 
 All filesystem operations are sandboxed to /workspace to prevent access outside the mounted directory.
 
@@ -144,5 +188,20 @@ All filesystem operations are sandboxed to /workspace to prevent access outside 
 - Add more domain tools (e.g., database query tool using Postgres)
 
 ## License
+## CI details and troubleshooting
+
+- The GitHub Actions workflow auto-generates a minimal .env and a workspace/ directory so that docker compose can run in CI without secrets.
+- Health checks: CI waits for these to respond with 2xx before proceeding:
+  - http://localhost:8001/health
+  - http://localhost:9000/health
+  - http://localhost:8080/health
+- The CI workflow avoids external network calls to prevent flakiness on GitHub-hosted runners.
+
+Troubleshooting:
+- If CI fails at docker compose config: ensure a .env exists. In CI this is created; locally run: cp .env.example .env and edit values.
+- If health checks time out: check docker compose logs, especially the mcp-tools and mcp-knowledge services, and verify that ports 8001 and 9000 are not conflicting on the runner/host.
+- If embedding import errors occur: the server lazily imports sentence-transformers only when OpenAI embeddings are not configured. Set OPENAI_API_KEY to use OpenAI embeddings, or ensure the container can download the model on first run.
+
+
 
 MIT
